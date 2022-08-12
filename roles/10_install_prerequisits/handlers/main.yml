@@ -1,0 +1,14 @@
+---
+# handlers file for 10_install_prerequisits
+
+- name: Unarchive aws cli
+  ansible.builtin.unarchive:
+    src: "/home/{{ ansible_user }}/awscliv2.zip"
+    dest: "/home/{{ ansible_user }}/"
+  listen: "install_aws_cli"
+
+- name: Install aws cli
+  ansible.builtin.shell: /home/{{ ansible_user }}/aws/install
+  args:
+    executable: /bin/bash
+  listen: "install_aws_cli"

@@ -1,0 +1,11 @@
+---
+- name: Prepare installer server
+  hosts: localhost
+  connection: local
+  remote_user: wooolf
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/aws_config.yaml"
+
+  roles:
+    - { role: 10_install_prerequisits, tags: ["prerequisits"] }

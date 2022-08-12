@@ -1,0 +1,79 @@
+---
+# tasks file for 10_install_prerequisits
+
+- name: Install software
+  block:
+    - name: Install tools
+      ansible.builtin.apt:
+        state: present
+        update_cache: yes
+        pkg:
+          - gnupg
+          - software-properties-common
+          - unzip
+          - curl
+          - wget
+          - mlocate
+      tags:
+        - tools
+
+    - name: Terraform
+      block:
+        - name: Install HashiCorp GPG key
+          ansible.builtin.get_url:
+            url: https://apt.releases.hashicorp.com/gpg
+            dest: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+        - name: Add HashiCorp repo
+          ansible.builtin.apt_repository:
+            repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+            state: present
+
+        - name: Install Terraform
+          ansible.builtin.apt:
+            state: present
+            update_cache: yes
+            name: terraform
+
+      tags:
+        - terraform
+
+    - name: aws cli
+      block:
+        - name: Download aws cli binaries
+          ansible.builtin.get_url:
+            url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+            dest: "/home/{{ ansible_user }}/awscliv2.zip"
+            mode: 0755
+          notify:
+            - install_aws_cli
+
+        - name: Create aws home dir
+          ansible.builtin.file:
+            path: /home/{{ ansible_user }}/.aws
+            state: directory
+            owner: wooolf
+            group: wooolf
+            mode: "0755"
+
+        - name: Create credentials
+          ansible.builtin.template:
+            src: credentials.j2
+            dest: /home/{{ ansible_user }}/.aws/credentials
+            owner: wooolf
+            group: wooolf
+            mode: 0755
+
+        - name: Create config
+          ansible.builtin.template:
+            src: config.j2
+            dest: /home/{{ ansible_user }}/.aws/config
+            owner: wooolf
+            group: wooolf
+            mode: 0755
+
+      tags:
+        - aws_cli
+
+  tags:
+    - prerequisits
