@@ -17,6 +17,18 @@ provider "aws" {
   }
 }
 
+
+################################################################
+#*
+#*  AWS NETWORK definition
+#*
+################################################################
+
+
+################################################################
+#* VPC
+################################################################
+
 resource "aws_vpc" "vpc_{{ project.name }}" {
   cidr_block       = "{{ project.network.vpc.cidr_block }}"
   instance_tenancy = "default"
@@ -30,6 +42,11 @@ resource "aws_vpc" "vpc_{{ project.name }}" {
   }
 }
 
+################################################################
+#* Subnet
+################################################################
+
+
 resource "aws_subnet" "subnet_{{ project.name }}" {
   vpc_id     = aws_vpc.vpc_{{ project.name }}.id
   cidr_block = "{{ project.network.subnets.cidr_block }}"
@@ -38,5 +55,83 @@ resource "aws_subnet" "subnet_{{ project.name }}" {
     {% for tag in project.network.subnets.tags %}
     "{{ tag.key }}" = "{{ tag.value }}"
     {% endfor %}
+  }
+}
+
+################################################################
+#* Internet Gateway
+################################################################
+
+resource "aws_internet_gateway" "gw_{{ project.name }}" {
+  vpc_id = aws_vpc.vpc_{{ project.name }}.id
+
+  tags = {
+    {% for tag in project.network.internet_gateway.tags %}
+    "{{ tag.key }}" = "{{ tag.value }}"
+    {% endfor %}
+  }
+}
+
+################################################################
+#* Route table
+################################################################
+
+resource "aws_route_table" "route_table_{{ project.name }}" {
+  vpc_id = aws_vpc.vpc_{{ project.name }}.id
+
+  tags = {
+    {% for tag in project.network.internet_gateway.tags %}
+    "{{ tag.key }}" = "{{ tag.value }}"
+    {% endfor %}
+  }
+}
+
+resource "aws_route" "r" {
+  route_table_id            = "aws_route_table.route_table_{{ project.name }}.id"
+  destination_cidr_block    = "0.0.0.0/0"
+  gateway_id                = "aws_internet_gateway.gw_{{ project.name }}.id"
+  depends_on                = [aws_route_table.route_table_{{ project.name }}]
+}
+
+resource "aws_route_table_association" "rt_association_{{ project.name }}" {
+  subnet_id      = "aws_subnet.subnet_{{ project.name }}.id"
+  route_table_id = "aws_route_table.route_table_{{ project.name }}.id"
+}
+
+################################################################
+#* Security group
+################################################################
+
+resource "aws_security_group" "sg_{{ project.name }}" {
+  name        = "sg_{{ project.name }}"
+  description = "Security group for {{ project.name }}"
+  vpc_id      = aws_vpc.vpc_{{ project.name }}.id
+
+  {% for sgs in project.network.security_groups.ingress_protocol %}
+    {% for elements in project.network.security_groups.ingress_protocol[sgs] %}
+      ingress{
+      protocol = "{{ sgs }}"
+      {% if sgs == "all" %}
+        {% for key, value in elements.items() %}
+            {{ key }} = ["{{ value }}"]
+            from_port         = 0
+            to_port           = 65535     
+        {% endfor %}  
+      {% else %}
+        {% for key, value in elements.items() %}
+            {% if key == "cidr_blocks" %}
+            {{ key }} = ["{{ value }}"]   
+            {% elif key == "port" %}
+            from_port = "{{ value }}"
+            to_port = "{{ value }}"
+            {% endif %}
+        {% endfor %}
+      {% endif %}
+      }
+    {% endfor %}
+  {% endfor %}
+
+  tags = {
+    Name = "{{ project.network.security_groups.name }}"
   }
 }
