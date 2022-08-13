@@ -39,7 +39,10 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+workspace/*
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform,ansible
 
-aws_config.yaml
+# Completed config files
+aws_config.yml
+global_parameters.yml

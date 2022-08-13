@@ -1,0 +1,42 @@
+################################################################
+#*
+#*  AWS provider definition
+#*
+################################################################
+
+provider "aws" {
+  region = "{{ region }}"
+
+  default_tags {
+    tags = {
+      "Project name"     = "{{ project.name }}"
+      {% for tag in project.default.tags %}
+      "{{ tag.key }}" = "{{ tag.value }}"
+      {% endfor %}
+    }
+  }
+}
+
+resource "aws_vpc" "vpc_{{ project.name }}" {
+  cidr_block       = "{{ project.network.vpc.cidr_block }}"
+  instance_tenancy = "default"
+  enable_dns_support = true
+  enable_dns_hostnames = true
+
+  tags = {
+    {% for tag in project.network.vpc.tags %}
+    "{{ tag.key }}" = "{{ tag.value }}"
+    {% endfor %}
+  }
+}
+
+resource "aws_subnet" "subnet_{{ project.name }}" {
+  vpc_id     = aws_vpc.vpc_{{ project.name }}.id
+  cidr_block = "{{ project.network.subnets.cidr_block }}"
+
+  tags = {
+    {% for tag in project.network.subnets.tags %}
+    "{{ tag.key }}" = "{{ tag.value }}"
+    {% endfor %}
+  }
+}

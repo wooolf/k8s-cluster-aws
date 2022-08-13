@@ -15,7 +15,7 @@
           - wget
           - mlocate
       tags:
-        - tools
+        - install_tools
 
     - name: Terraform
       block:
@@ -36,7 +36,7 @@
             name: terraform
 
       tags:
-        - terraform
+        - install_terraform
 
     - name: aws cli
       block:
@@ -47,37 +47,36 @@
             mode: 0755
           notify:
             - install_aws_cli
-            
+
         - name: aws credentials
           block:
+            - name: Create aws home dir
+              ansible.builtin.file:
+                path: /home/{{ ansible_user }}/.aws
+                state: directory
+                owner: wooolf
+                group: wooolf
+                mode: "0755"
 
-          - name: Create aws home dir
-            ansible.builtin.file:
-              path: /home/{{ ansible_user }}/.aws
-              state: directory
-              owner: wooolf
-              group: wooolf
-              mode: "0755"
+            - name: Create credentials
+              ansible.builtin.template:
+                src: credentials.j2
+                dest: /home/{{ ansible_user }}/.aws/credentials
+                owner: wooolf
+                group: wooolf
+                mode: 0755
 
-          - name: Create credentials
-            ansible.builtin.template:
-              src: credentials.j2
-              dest: /home/{{ ansible_user }}/.aws/credentials
-              owner: wooolf
-              group: wooolf
-              mode: 0755
+            - name: Create config
+              ansible.builtin.template:
+                src: config.j2
+                dest: /home/{{ ansible_user }}/.aws/config
+                owner: wooolf
+                group: wooolf
+                mode: 0755
 
-          - name: Create config
-            ansible.builtin.template:
-              src: config.j2
-              dest: /home/{{ ansible_user }}/.aws/config
-              owner: wooolf
-              group: wooolf
-              mode: 0755
           when: AWS_CREDENTIALS == 'true'
           tags:
-            - credentials
-          
+            - create_credentials
 
       tags:
         - aws_cli

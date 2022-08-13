@@ -5,7 +5,23 @@
   remote_user: wooolf
   become: true
   vars_files:
-    - "{{ playbook_dir }}/aws_config.yaml"
+    - "{{ playbook_dir }}/aws_config.yml"
+    - "{{ playbook_dir }}/global_parameters.yml"
 
   roles:
-    - { role: 10_install_prerequisits, tags: ["prerequisits"] }
+    - {
+        role: 10_install_prerequisits,
+        tags:
+          [
+            "prerequisits",
+            "install_tools",
+            "install_terraform",
+            "create_credentials",
+          ],
+      }
+
+    - {
+        role: 20_provision_aws_resources,
+        tags: ["init_terraform"],
+        become: false,
+      }
