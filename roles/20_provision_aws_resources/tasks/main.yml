@@ -9,26 +9,26 @@
     - name: 10 - Create terraform manifest
       ansible.builtin.template:
         src: main.j2
-        dest: "{{playbook_dir}}/workspace/main.tf"
+        dest: "{{playbook_dir}}/workspace//{{ project.name }}/main.tf"
 
     - name: 20 - Format main.tf
-      command: terraform -chdir="{{playbook_dir}}/workspace" fmt
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" fmt
 
     - name: 30 - Terraform init
-      command: terraform -chdir="{{playbook_dir}}/workspace" init
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" init
 
     - name: 40 - Terraform validation
-      command: terraform -chdir="{{playbook_dir}}/workspace" validate
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" validate
 
     - name: 50 - Set var
       set_fact:
         ANSIBLE_STDOUT_CALLBACK: "debug"
 
     - name: 60 - Terraform plan
-      command: terraform -chdir="{{playbook_dir}}/workspace" plan -out="{{ project.name }}_plan.out"
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" plan -out="{{ project.name }}_plan.out"
 
     - name: 70 - Terraform plan show
-      command: terraform -chdir="{{playbook_dir}}/workspace" show -no-color "{{ project.name }}_plan.out"
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" show -no-color "{{ project.name }}_plan.out"
       register: t_plan
 
     # To make it human readable you have to setup parameters in /etc/ansible/ansible.cfg
@@ -39,7 +39,7 @@
         ANSIBLE_STDOUT_CALLBACK: "debug"
       debug: msg="{{ t_plan.stdout }}"
     # - name: 90 - Terraform apply
-    #   command: terraform -chdir="{{playbook_dir}}/workspace" apply -auto-approve {{ project.name }}_plan.out
+    #   command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" apply -auto-approve {{ project.name }}_plan.out
     #   register: t_apply
 
     # - name: 100 - Print apply

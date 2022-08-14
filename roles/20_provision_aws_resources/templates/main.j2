@@ -5,7 +5,7 @@
 ################################################################
 
 provider "aws" {
-  region = "{{ region }}"
+  region                      = "{{ region }}"
 
   default_tags {
     tags = {
@@ -76,11 +76,16 @@ resource "aws_internet_gateway" "gw_{{ project.name }}" {
 #* Route table
 ################################################################
 
+
 resource "aws_route_table" "route_table_{{ project.name }}" {
   vpc_id = aws_vpc.vpc_{{ project.name }}.id
 
+  route {
+    cidr_block = "{{ project.network.route_table.cidr_block }}"
+  }
+
   tags = {
-    {% for tag in project.network.internet_gateway.tags %}
+    {% for tag in project.network.route_table.tags %}
     "{{ tag.key }}" = "{{ tag.value }}"
     {% endfor %}
   }
@@ -140,11 +145,11 @@ resource "aws_security_group" "sg_{{ project.name }}" {
 #* Load balancer
 ################################################################
 
+
 resource "aws_lb" "lb_{{ project.name }}" {
   name               = "{{ project.network.load_balancer.name }}"
   internal           = false
   load_balancer_type = "{{ project.network.load_balancer.type }}"
-  security_groups    = [aws_security_group.sg_{{ project.name }}.id]
   subnets            = [aws_subnet.subnet_{{ project.name }}.id]
 
   enable_deletion_protection = false

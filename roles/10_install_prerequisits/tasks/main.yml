@@ -19,6 +19,14 @@
 
     - name: Terraform
       block:
+        - name: Project directory
+          ansible.builtin.file:
+            state: directory
+            path: "{{ playbook_dir }}/workspace/{{ project.name }}"
+            owner: wooolf
+            group: wooolf
+            mode: "0755"
+
         - name: Install HashiCorp GPG key
           ansible.builtin.get_url:
             url: https://apt.releases.hashicorp.com/gpg
@@ -74,7 +82,7 @@
                 group: wooolf
                 mode: 0755
 
-          when: AWS_CREDENTIALS == 'true'
+          when: aws_credentials == 'true'
           tags:
             - create_credentials
 
