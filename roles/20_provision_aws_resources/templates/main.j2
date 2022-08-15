@@ -7,6 +7,43 @@
 provider "aws" {
   region                      = "{{ region }}"
 
+  {% if localstack.enabled == true %}
+
+  access_key                  = "test"
+  secret_key                  = "test"
+  s3_use_path_style         = true
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+
+
+  endpoints {
+    apigateway     = "http://localhost:4566"
+    apigatewayv2   = "http://localhost:4566"
+    cloudformation = "http://localhost:4566"
+    cloudwatch     = "http://localhost:4566"
+    dynamodb       = "http://localhost:4566"
+    ec2            = "http://localhost:4566"
+    es             = "http://localhost:4566"
+    elasticache    = "http://localhost:4566"
+    firehose       = "http://localhost:4566"
+    iam            = "http://localhost:4566"
+    kinesis        = "http://localhost:4566"
+    lambda         = "http://localhost:4566"
+    rds            = "http://localhost:4566"
+    redshift       = "http://localhost:4566"
+    route53        = "http://localhost:4566"
+    s3             = "http://s3.localhost.localstack.cloud:4566"
+    secretsmanager = "http://localhost:4566"
+    ses            = "http://localhost:4566"
+    sns            = "http://localhost:4566"
+    sqs            = "http://localhost:4566"
+    ssm            = "http://localhost:4566"
+    stepfunctions  = "http://localhost:4566"
+    sts            = "http://localhost:4566"
+  }
+  {% endif %}
+
   default_tags {
     tags = {
       "Project name"     = "{{ project.name }}"
@@ -15,6 +52,32 @@ provider "aws" {
       {% endfor %}
     }
   }
+}
+
+################################################################
+#*
+#*  AWS KEY PAR
+#*
+################################################################
+
+resource "tls_private_key" "{{ project.name | lower }}_key_generated" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_key_pair" "{{ project.name | lower }}_key" {
+  key_name   = "{{ project.name | lower }}_key"
+  public_key = tls_private_key.{{ project.name | lower }}_key_generated.public_key_openssh
+
+  provisioner "local-exec" {
+    command = "echo '${tls_private_key.{{ project.name | lower }}_key_generated.private_key_pem}' > ${aws_key_pair.{{ project.name | lower }}_key.key_name}.pem; chmod 400 ${aws_key_pair.{{ project.name | lower }}_key.key_name}.pem"
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "rm -f {{ project.name | lower }}_key.pem"
+  }
+
 }
 
 
@@ -27,6 +90,7 @@ provider "aws" {
 
 ################################################################
 #* VPC
+#* awslocal ec2 describe-vpcs --output yaml
 ################################################################
 
 resource "aws_vpc" "vpc_{{ project.name }}" {
@@ -44,6 +108,7 @@ resource "aws_vpc" "vpc_{{ project.name }}" {
 
 ################################################################
 #* Subnet
+#* awslocal ec2 describe-subnets --output yaml
 ################################################################
 
 
@@ -60,6 +125,7 @@ resource "aws_subnet" "subnet_{{ project.name }}" {
 
 ################################################################
 #* Internet Gateway
+#* awslocal ec2 describe-internet-gateways --output yaml
 ################################################################
 
 resource "aws_internet_gateway" "gw_{{ project.name }}" {
@@ -74,6 +140,7 @@ resource "aws_internet_gateway" "gw_{{ project.name }}" {
 
 ################################################################
 #* Route table
+#* awslocal ec2 describe-route-tables --output yaml
 ################################################################
 
 
@@ -82,6 +149,7 @@ resource "aws_route_table" "route_table_{{ project.name }}" {
 
   route {
     cidr_block = "{{ project.network.route_table.cidr_block }}"
+    gateway_id = aws_internet_gateway.gw_{{ project.name }}.id
   }
 
   tags = {
@@ -91,20 +159,15 @@ resource "aws_route_table" "route_table_{{ project.name }}" {
   }
 }
 
-resource "aws_route" "r" {
-  route_table_id            = "aws_route_table.route_table_{{ project.name }}.id"
-  destination_cidr_block    = "0.0.0.0/0"
-  gateway_id                = "aws_internet_gateway.gw_{{ project.name }}.id"
-  depends_on                = [aws_route_table.route_table_{{ project.name }}]
-}
-
 resource "aws_route_table_association" "rt_association_{{ project.name }}" {
-  subnet_id      = "aws_subnet.subnet_{{ project.name }}.id"
-  route_table_id = "aws_route_table.route_table_{{ project.name }}.id"
+  subnet_id      = aws_subnet.subnet_{{ project.name }}.id
+  route_table_id = aws_route_table.route_table_{{ project.name }}.id
+  depends_on     = [aws_route_table.route_table_{{ project.name }}]
 }
 
 ################################################################
 #* Security group
+#* awslocal ec2 describe-security-groups --output yaml
 ################################################################
 
 resource "aws_security_group" "sg_{{ project.name }}" {
@@ -143,6 +206,7 @@ resource "aws_security_group" "sg_{{ project.name }}" {
 
 ################################################################
 #* Load balancer
+#* awslocal elb describe-load-balancers --output yaml
 ################################################################
 
 
@@ -159,6 +223,11 @@ resource "aws_lb" "lb_{{ project.name }}" {
   }
 }
 
+################################################################
+#* Load balancer target group
+#* awslocal elbv2 describe-target-groups --output yaml
+################################################################
+
 resource "aws_lb_target_group" "{{ project.network.load_balancer.target_group.name }}" {
   name     = "{{ project.network.load_balancer.target_group.name }}"
   port     = {{ project.network.load_balancer.target_group.port }}
@@ -167,13 +236,14 @@ resource "aws_lb_target_group" "{{ project.network.load_balancer.target_group.na
   target_type = "{{ project.network.load_balancer.target_group.target_type }}"
 }
 
-resource "aws_lb_target_group_attachment" "{{ project.network.load_balancer.group_attachment.name }}" {
-  target_group_arn = aws_lb_target_group.{{ project.network.load_balancer.target_group.name }}.arn
-  target_id        = "{{ project.network.load_balancer.group_attachment.id }}"
-}
+
+################################################################
+#* Load balancer listiner
+#* awslocal elbv2 describe-listeners --output yaml
+################################################################
 
 resource "aws_lb_listener" "front_end" {
-  load_balancer_arn = aws_lb_target_group.{{ project.network.load_balancer.target_group.name }}.arn
+  load_balancer_arn = aws_lb.lb_{{ project.name }}.arn
   port              = "{{ project.network.load_balancer.listener.port }}"
   protocol          = "{{ project.network.load_balancer.listener.protocol }}"
 
@@ -181,4 +251,116 @@ resource "aws_lb_listener" "front_end" {
     type             = "{{ project.network.load_balancer.listener.default_action_type }}"
     target_group_arn = aws_lb_target_group.{{ project.network.load_balancer.target_group.name }}.arn
   }
+}
+
+
+################################################################
+#*
+#*  AWS EC2
+#*
+################################################################
+
+{% if localstack.enabled == false %}
+
+data "aws_ami" "ami_{{ project.name }}" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["{{ project.instances.ami.reg_name }}"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["{{ project.instances.ami.architecture }}"]
+  }
+
+  owners = ["{{ project.instances.ami.owner }}"]
+}
+
+{% endif %}
+
+
+{% for inst_type in project.instances.ec2.prefix_name %}
+
+################################################################
+#* EC2 instances - {{ inst_type | replace("-","") | upper }}
+################################################################
+
+{% set counter = [0] -%}
+{% for n in project.network.load_balancer.group_attachment.id %}
+
+resource "aws_instance" "{{ inst_type }}{{ counter[0] }}" {
+ 
+  {% if localstack.enabled == false %}
+  ami           = data.aws_ami.ami_{{ project.name }}.id
+  {% elif localstack.enabled == true %}
+  ami           = "{{ localstack.ami_id }}"
+  {% endif %}
+  count = 1
+  associate_public_ip_address = true
+  key_name = aws_key_pair.{{ project.name | lower }}_key.key_name
+  instance_type = "t3.micro"
+  subnet_id = aws_subnet.subnet_{{ project.name }}.id
+  vpc_security_group_ids = [aws_security_group.sg_{{ project.name }}.id]
+  {% if inst_type == "controller-" %}
+  private_ip = "{{ n.split('.')[0:3] | join('.') }}.1{{ counter[0] }}"
+  user_data = "name={{ inst_type }}{{ counter[0] }}"
+  {% elif inst_type == "worker-" %}
+  private_ip = "{{ n.split('.')[0:3] | join('.') }}.2{{ counter[0] }}"
+  user_data = "name={{ inst_type }}{{ counter[0] }}|pod-cidr=10.200.{{ counter[0] }}.0/24"
+  {% endif %}
+
+  root_block_device {
+    volume_size = "{{ project.instances.ec2.volume.size }}"
+    volume_type = "{{ project.instances.ec2.volume.type }}"
+  }
+
+  tags = {
+    Name = "{{ inst_type }}{{ counter[0] }}"
+  }
+}
+
+{% if inst_type == "controller-" %}
+
+################################################################
+#* Load balancer target group attachment
+################################################################
+
+resource "aws_lb_target_group_attachment" "{{ project.network.load_balancer.group_attachment.name }}_{{ counter[0] }}" {
+  target_group_arn = aws_lb_target_group.{{ project.network.load_balancer.target_group.name }}.arn
+  target_id        = aws_instance.{{ inst_type }}{{ counter[0] }}[0].private_ip
+}
+
+{% endif %}
+
+{% if counter.append(counter.pop() + 1) %}{% endif %}
+{% endfor %}
+{% endfor %}
+
+resource "local_file" "AnsibleInventory" {
+
+content = <<EOT
+---
+aws_inventory:
+  children:
+{% for inst_type in project.instances.ec2.prefix_name %}
+{% set counter = [0] -%}
+{% set host_group = inst_type | replace("-","") %}
+    {{ host_group }}:
+      hosts:
+{% for n in project.network.load_balancer.group_attachment.id %}
+        {{ inst_type }}{{ counter[0] }}:
+          ansible_host: ${aws_instance.{{ inst_type }}{{ counter[0] }}[0].public_dns}
+          ansible_host_ip: ${aws_instance.{{ inst_type }}{{ counter[0] }}[0].public_ip}
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: "${aws_key_pair.{{ project.name | lower }}_key.key_name}.pem"
+          ansible_host_key_checking: false
+{% if counter.append(counter.pop() + 1) %}{% endif %}
+{% endfor %}
+{% endfor %}
+EOT
+
+  filename = "{{ project.name }}_aws_inventory.yml"
+
 }
