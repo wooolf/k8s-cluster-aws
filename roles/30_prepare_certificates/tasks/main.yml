@@ -1,2 +1,34 @@
 ---
 # tasks file for 30_prepare_certificates
+
+- name: Generate keys
+  block:
+    - name: 10 - Create cert folder
+      ansible.builtin.file:
+        state: directory
+        path: "{{ playbook_dir }}/workspace/{{ project.name }}/{{ item }}"
+        owner: "{{ ansible_user }}"
+        mode: "0700"
+      loop:
+        - certs
+
+    - name: 20 - Transfer scripts
+      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
+      register: transfer_scripts
+
+    - name: 30 - Install CFSSL - execute the script
+      command: "/bin/bash {{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
+      args:
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+      with_items:
+        - ca_cert.sh
+        - admin_cert.sh
+        - client_cert.sh
+        - control_manager_cert.sh
+        - kube_proxy_cert.sh
+        - scheduler_cert.sh
+        - api_server_cert.sh
+        - service_account_cert.sh
+
+  tags:
+    - certs

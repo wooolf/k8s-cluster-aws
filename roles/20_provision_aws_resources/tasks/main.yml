@@ -34,27 +34,27 @@
       set_fact:
         ANSIBLE_STDOUT_CALLBACK: "debug"
 
-    # - name: 60 - Terraform plan
-    #   command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" plan -out="{{ project.name }}_plan.out"
+    - name: 60 - Terraform plan
+      command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" plan -out="{{ project.name }}_plan.out"
 
-    # - name: 70 - Terraform plan show
-    #   command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" show -no-color "{{ project.name }}_plan.out"
-    #   register: t_plan
+    - name: 70 - Terraform plan show
+      command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" show -no-color "{{ project.name }}_plan.out"
+      register: t_plan
 
     # To make it human readable you have to setup parameters in /etc/ansible/ansible.cfg
     # bin_ansible_callbacks = True
     # stdout_callback = yaml
-    # - name: 80 - Print plan
-    #   vars:
-    #     ANSIBLE_STDOUT_CALLBACK: "debug"
-    #   debug: msg="{{ t_plan.stdout }}"
-    # - name: 90 - Terraform apply
-    #   command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" apply -auto-approve {{ project.name }}_plan.out
-    #   register: t_apply
+    - name: 80 - Print plan
+      vars:
+        ANSIBLE_STDOUT_CALLBACK: "debug"
+      debug: msg="{{ t_plan.stdout }}"
+    - name: 90 - Terraform apply
+      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" apply -auto-approve {{ project.name }}_plan.out
+      register: t_apply
 
-    # - name: 100 - Print apply
-    #   vars:
-    #     ANSIBLE_STDOUT_CALLBACK: "debug"
-    #   debug: msg="{{ t_apply.stdout }}"
+    - name: 100 - Print apply
+      vars:
+        ANSIBLE_STDOUT_CALLBACK: "debug"
+      debug: msg="{{ t_apply.stdout }}"
   tags:
     - init_terraform

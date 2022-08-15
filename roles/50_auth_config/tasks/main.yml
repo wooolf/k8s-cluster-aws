@@ -1,0 +1,21 @@
+---
+# tasks file for 50_auth_config
+
+- name: Generate config
+  block:
+    - name: Transfer scripts
+      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
+      register: transfer_scripts
+
+    - name: Generate auth config
+      command: /bin/bash "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
+      args:
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+      with_items:
+        - kube_config.sh
+        - kube_proxy.sh
+        - kube_controller.sh
+        - kube_scheduler.sh
+        - kube_admin.sh
+  tags:
+    - auth_config

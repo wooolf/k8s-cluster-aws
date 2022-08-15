@@ -25,3 +25,26 @@
         tags: ["init_terraform"],
         become: false,
       }
+
+    - { role: 30_prepare_certificates, tags: ["certs"], become: false }
+
+- name: Prepare installer server
+  hosts: all
+  remote_user: ubuntu
+  vars_files:
+    - "{{ playbook_dir }}/aws_config.yml"
+    - "{{ playbook_dir }}/global_parameters.yml"
+
+  roles:
+    - { role: 40_copy_keys_certs, tags: ["copy_secrets"] }
+
+- name: Generate auth config
+  hosts: localhost
+  vars_files:
+    - "{{ playbook_dir }}/aws_config.yml"
+    - "{{ playbook_dir }}/global_parameters.yml"
+
+  roles:
+    - { role: 50_auth_config, tags: ["auth_config"] }
+    - { role: 60_copy_config, tags: ["copy_config"] }
+    - { role: 70_data_enc, tags: ["encryption"] }

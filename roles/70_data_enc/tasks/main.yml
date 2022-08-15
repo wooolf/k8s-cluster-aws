@@ -1,0 +1,18 @@
+---
+# tasks file for 70_data_enc
+
+- name: Encryption
+  block:
+    - name: 10 - Transfer scripts
+      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
+      register: transfer_scripts
+
+    - name: 20 - Execute encryption and copy to controllers
+      command: /bin/bash {{ item }} {{ playbook_dir }} {{ project.name }}
+      args:
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+      with_items:
+        - encryption.sh
+        - encryption_copy.sh
+  tags:
+    - encryption

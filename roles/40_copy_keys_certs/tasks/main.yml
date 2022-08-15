@@ -1,0 +1,31 @@
+---
+# tasks file for 40_copy_keys_certs
+
+- name: 10 - Copy keys to controllers
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
+    dest: ~/
+    owner: "{{ ansible_user }}"
+    mode: "0700"
+  loop:
+    - ca.pem
+    - ca-key.pem
+    - kubernetes-key.pem
+    - kubernetes.pem
+    - service-account-key.pem
+    - service-account.pem
+  when: "'controller' in group_names"
+  tags:
+    - "copy_secrets"
+
+- name: 20 - Copy keys to workers
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
+    dest: ~/
+    owner: "{{ ansible_user }}"
+    mode: "0700"
+  loop:
+    - ca.pem
+  when: "'worker' in group_names"
+  tags:
+    - "copy_secrets"
