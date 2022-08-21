@@ -4,23 +4,7 @@ for i in 0 1 2; do
   instance="worker-${i}"
   instance_hostname="ip-10-0-1-2${i}"
   cat > ${instance}-csr.json <<EOF
-{
-  "CN": "system:node:${instance_hostname}",
-  "key": {
-    "algo": "rsa",
-    "size": 2048
-  },
-  "names": [
-    {
-      "C": "PL",
-      "L": "Poland",
-      "O": "system:nodes",
-      "OU": "Kubernetes The Hard Way",
-      "ST": "WLKP"
-    }
-  ]
-}
-EOF
+
 
   external_ip=$(aws ec2 describe-instances --filters \
     "Name=tag:Name,Values=${instance}" \

@@ -1,31 +1,28 @@
 ---
 # tasks file for 40_copy_keys_certs
 
-- name: 10 - Copy keys to controllers
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
-    dest: ~/
-    owner: "{{ ansible_user }}"
-    mode: "0700"
-  loop:
-    - ca.pem
-    - ca-key.pem
-    - kubernetes-key.pem
-    - kubernetes.pem
-    - service-account-key.pem
-    - service-account.pem
-  when: "'controller' in group_names"
-  tags:
-    - "copy_secrets"
+- name: Copy csr and keys
+  block:
+    - name: 10 - Transfer worker keys
+      copy: src="{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item.el }}" dest="/home/{{ ansible_user }}/{{ item.el }}" mode=0644
+      when: inventory_hostname is regex("{{ item.id }}.*") and "'worker' in group_names"
+      with_items:
+        - { id: worker-0, el: worker-0-key.pem }
+        - { id: worker-0, el: worker-0.pem }
+        - { id: worker-1, el: worker-1-key.pem }
+        - { id: worker-1, el: worker-1.pem }
+        - { id: worker-2, el: worker-2-key.pem }
+        - { id: worker-2, el: worker-2.pem }
 
-- name: 20 - Copy keys to workers
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
-    dest: ~/
-    owner: "{{ ansible_user }}"
-    mode: "0700"
-  loop:
-    - ca.pem
-  when: "'worker' in group_names"
+    - name: 20 - Transfer controller scripts
+      copy: src={{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }} dest="/home/{{ ansible_user }}/" mode=0644
+      when: "'controller' in group_names"
+      with_items:
+        - ca.pem
+        - ca-key.pem
+        - kubernetes-key.pem
+        - kubernetes.pem
+        - service-account-key.pem
+        - service-account.pem
   tags:
     - "copy_secrets"

@@ -26,16 +26,15 @@
         become: false,
       }
 
-    - { role: 30_prepare_certificates, tags: ["certs"], become: false }
-
 - name: Prepare installer server
-  hosts: all
+  hosts: aws_inventory
   remote_user: ubuntu
   vars_files:
     - "{{ playbook_dir }}/aws_config.yml"
     - "{{ playbook_dir }}/global_parameters.yml"
 
   roles:
+    - { role: 30_prepare_certificates, tags: ["certs"], become: true }
     - { role: 40_copy_keys_certs, tags: ["copy_secrets"] }
 
 - name: Generate auth config
@@ -48,3 +47,12 @@
     - { role: 50_auth_config, tags: ["auth_config"] }
     - { role: 60_copy_config, tags: ["copy_config"] }
     - { role: 70_data_enc, tags: ["encryption"] }
+
+- name: Deploy cluster
+  hosts: all
+  vars_files:
+    - "{{ playbook_dir }}/aws_config.yml"
+    - "{{ playbook_dir }}/global_parameters.yml"
+
+  roles:
+    - { role: 80_etcd_cluster, tags: ["etcd"], become: true }

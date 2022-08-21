@@ -2,25 +2,6 @@
 
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
-cat > kubernetes-csr.json <<EOF
-{
-  "CN": "kubernetes",
-  "key": {
-    "algo": "rsa",
-    "size": 2048
-  },
-  "names": [
-    {
-      "C": "PL",
-      "L": "Poland",
-      "O": "Kubernetes",
-      "OU": "Kubernetes The Hard Way",
-      "ST": "WLKP"
-    }
-  ]
-}
-EOF
-
 cfssl gencert \
   -ca=ca.pem \
   -ca-key=ca-key.pem \

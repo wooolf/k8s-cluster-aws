@@ -1,23 +1,5 @@
 #!/bin/bash
 
-cat > kube-scheduler-csr.json <<EOF
-{
-  "CN": "system:kube-scheduler",
-  "key": {
-    "algo": "rsa",
-    "size": 2048
-  },
-  "names": [
-    {
-      "C": "PL",
-      "L": "Poland",
-      "O": "system:kube-scheduler",
-      "OU": "Kubernetes The Hard Way",
-      "ST": "WLKP"
-    }
-  ]
-}
-EOF
 
 cfssl gencert \
   -ca=ca.pem \

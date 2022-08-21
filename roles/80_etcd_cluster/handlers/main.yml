@@ -1,0 +1,8 @@
+---
+# handlers file for 80_etcd_cluster
+
+- name: Configure service
+  command: /bin/bash /home/{{ ansible_user }}/deploy_etcd.sh
+  listen: "Run etcd config"
+  tags:
+    - etcd

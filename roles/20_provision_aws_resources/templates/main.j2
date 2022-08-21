@@ -159,10 +159,26 @@ resource "aws_route_table" "route_table_{{ project.name }}" {
   }
 }
 
+resource "aws_route" "route_{{ project.name }}" {
+  route_table_id         = "${aws_route_table.route_table_{{ project.name }}.id}"
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = "${aws_internet_gateway.gw_{{ project.name }}.id}"
+  depends_on             = [
+    aws_route_table.route_table_{{ project.name }}
+  ]
+}
+
+resource "aws_main_route_table_association" "vpc_route_assoc_{{ project.name }}" {
+  vpc_id         = aws_vpc.vpc_{{ project.name }}.id
+  route_table_id = aws_route_table.route_table_{{ project.name }}.id
+}
+
 resource "aws_route_table_association" "rt_association_{{ project.name }}" {
   subnet_id      = aws_subnet.subnet_{{ project.name }}.id
   route_table_id = aws_route_table.route_table_{{ project.name }}.id
-  depends_on     = [aws_route_table.route_table_{{ project.name }}]
+  depends_on     = [
+    aws_route_table.route_table_{{ project.name }}
+  ]
 }
 
 ################################################################
@@ -198,6 +214,14 @@ resource "aws_security_group" "sg_{{ project.name }}" {
       }
     {% endfor %}
   {% endfor %}
+
+    egress {
+      from_port        = 0
+      to_port          = 0
+      protocol         = "-1"
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+    }
 
   tags = {
     Name = "{{ project.network.security_groups.name }}"
@@ -318,8 +342,18 @@ resource "aws_instance" "{{ inst_type }}{{ counter[0] }}" {
 
   tags = {
     Name = "{{ inst_type }}{{ counter[0] }}"
+    Group = "{{ inst_type | replace("-","") }}"
   }
 }
+
+  # Maximum limit of 5
+  # resource "aws_eip" "eip-{{ inst_type }}{{ counter[0] }}" {
+  #   instance = aws_instance.{{ inst_type }}{{ counter[0] }}[0].id
+  #   vpc      = true
+  #   depends_on = [
+  #   aws_internet_gateway.gw_{{ project.name }}
+  #   ]
+  # }
 
 {% if inst_type == "controller-" %}
 
@@ -338,17 +372,18 @@ resource "aws_lb_target_group_attachment" "{{ project.network.load_balancer.grou
 {% endfor %}
 {% endfor %}
 
-resource "local_file" "AnsibleInventory" {
+resource "local_file" "AnsibleStaticInventory" {
 
 content = <<EOT
 ---
 aws_inventory:
   children:
     local:
-      localhost:
-        ansible_onnection: local
-        ansible_host: localhost
-        ansible_host_ip: 127.0.0.1
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_host: localhost
+          ansible_host_ip: 127.0.0.1
 {% for inst_type in project.instances.ec2.prefix_name %}
 {% set counter = [0] -%}
 {% set host_group = inst_type | replace("-","") %}
@@ -358,6 +393,7 @@ aws_inventory:
         {{ inst_type }}{{ counter[0] }}:
           ansible_host: ${aws_instance.{{ inst_type }}{{ counter[0] }}[0].public_dns}
           ansible_host_ip: ${aws_instance.{{ inst_type }}{{ counter[0] }}[0].public_ip}
+          ansible_host_private_ip: ${aws_instance.{{ inst_type }}{{ counter[0] }}[0].private_ip}
           ansible_user: ubuntu
           ansible_ssh_private_key_file: "{{ playbook_dir }}/workspace/{{ project.name }}/${aws_key_pair.{{ project.name | lower }}_key.key_name}.pem"
           ansible_host_key_checking: false
@@ -366,6 +402,61 @@ aws_inventory:
 {% endfor %}
 EOT
 
-  filename = "{{ project.name }}_aws_inventory.yml"
+  filename = "inventory_static/{{ project.name }}_aws_inventory.yml"
+
+}
+
+
+resource "local_file" "AnsibleDynamicInventory" {
+
+content = <<EOT
+---
+plugin: aws_ec2
+aws_profile: default
+filters:
+  tag:Group:
+    - worker
+    - controller
+
+hostnames:
+  - ip-address
+
+groups:
+  worker: "'worker' in tags.Group"
+  controller: "'controller' in tags.Group"
+EOT
+
+  filename = "inventory_dynamic/{{ project.name }}.aws_ec2.yml"
+
+}
+
+resource "local_file" "AnsibleDynamicLocalhost" {
+
+content = <<EOT
+---
+all:
+  children:
+    local:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_host: localhost
+          ansible_host_ip: 127.0.0.1
+EOT
+
+  filename = "inventory_dynamic/{{ project.name }}.local.yml"
+
+}
+
+resource "local_file" "AnsibleDynamicInventoryVars" {
+
+content = <<EOT
+---
+ansible_ssh_private_key_file: "{{ playbook_dir }}/workspace/k8s_cluster/k8s_cluster_key.pem"
+ansible_user: ubuntu
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+EOT
+
+  filename = "inventory_dynamic/group_vars/all.yml"
 
 }

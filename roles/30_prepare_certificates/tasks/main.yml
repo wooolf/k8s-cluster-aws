@@ -1,7 +1,32 @@
 ---
 # tasks file for 30_prepare_certificates
 
-- name: Generate keys
+- name: Include inventory
+  ansible.builtin.include_vars:
+    file: workspace/{{ project.name }}/inventory_static/{{ project.name }}_aws_inventory.yml
+    name: inv
+
+- name: Define workers
+  ansible.builtin.set_fact:
+    WORKER: "{{ inv['aws_inventory']['children']['worker']['hosts'] }}"
+
+- name: Define controllers
+  ansible.builtin.set_fact:
+    CONTROLLERS: "{{ inv['aws_inventory']['children']['controller']['hosts'] }}"
+
+  # - name: Debug
+  #   debug:
+  #     msg: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ WORKER[item]['ansible_host'] }},{{ WORKER[item]['ansible_host_ip'] }},{{ WORKER[item]['ansible_host_private_ip'] }} -profile=kubernetes {{ item }}-csr.json | cfssljson -bare {{ item }}
+  #     # msg: "Worker {{ item }}: {{ WORKER[item] }}"
+  #   with_items:
+  #     - worker-0
+  #     - worker-1
+  #     - worker-2
+
+  tags: certs
+- name: Generate certs and keys
+  remote_user: wooolf
+  become: false
   block:
     - name: 10 - Create cert folder
       ansible.builtin.file:
@@ -12,23 +37,79 @@
       loop:
         - certs
 
-    - name: 20 - Transfer scripts
-      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
-      register: transfer_scripts
-
-    - name: 30 - Install CFSSL - execute the script
-      command: "/bin/bash {{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
-      args:
-        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+    - name: 20 - Create certificat signing request for each service
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
+        mode: 0644
       with_items:
-        - ca_cert.sh
-        - admin_cert.sh
-        - client_cert.sh
-        - control_manager_cert.sh
-        - kube_proxy_cert.sh
-        - scheduler_cert.sh
-        - api_server_cert.sh
-        - service_account_cert.sh
+        - admin-csr.json
+        - ca-config.json
+        - ca-csr.json
+        - kube-controller-manager-csr.json
+        - kube-proxy-csr.json
+        - kube-scheduler-csr.json
+        - kubernetes-csr.json
+        - service-account-csr.json
 
+    - name: 30 - Generate worker certificates for Node Authorizer
+      ansible.builtin.template:
+        src: "worker-csr.json.j2"
+        dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}-csr.json"
+        mode: 0644
+      with_items:
+        - worker-0
+        - worker-1
+        - worker-2
+
+    - name: 40 - Generate authority certificates
+      ansible.builtin.shell:
+        cmd: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 50 - Generate admin client certificates
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare admin
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 60 - Generate worker certificates for Node Authorizer
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname={{ WORKER[item]['ansible_host'] }},{{ WORKER[item]['ansible_host_ip'] }},{{ WORKER[item]['ansible_host_private_ip'] }} -profile=kubernetes {{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}-csr.json | cfssljson -bare {{ item }}
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+      with_items:
+        - worker-0
+        - worker-1
+        - worker-2
+
+    - name: 70 - Generate Controller Manager Client Certificate
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 80 - Generate Kube Proxy Client Certificate
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-proxy-csr.json | cfssljson -bare kube-proxy
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 90 - Generate Scheduler Client Certificate
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes kube-scheduler-csr.json | cfssljson -bare kube-scheduler
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 100 - Set Kubernetes hostnames
+      ansible.builtin.set_fact:
+        KUBERNETES_HOSTNAMES: "kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
+
+    - name: 110 - Generate Kubernetes API Server Certificate
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -hostname=10.32.0.1,10.0.1.10,10.0.1.11,10.0.1.12,${KUBERNETES_PUBLIC_ADDRESS},127.0.0.1,{{ KUBERNETES_HOSTNAMES }} -profile=kubernetes kubernetes-csr.json | cfssljson -bare kubernetes
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+    - name: 120 - Generate Service Account Key Pair
+      ansible.builtin.shell:
+        cmd: cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes service-account-csr.json | cfssljson -bare service-account
+        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+
+  when: group_names[1] == "local"
   tags:
     - certs

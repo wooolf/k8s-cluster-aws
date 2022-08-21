@@ -1,0 +1,16 @@
+{
+  "CN": "system:kube-controller-manager",
+  "key": {
+    "algo": "{{ project.cert.key.t }}",
+    "size": {{ project.cert.key.b }}
+  },
+  "names": [
+    {
+      "C": "{{ project.cert.names.c }}",
+      "L": "{{ project.cert.names.l }}",
+      "O": "{{ project.cert.names.o }}",
+      "OU": "{{ project.cert.names.ou }}",
+      "ST": "{{ project.cert.names.st }}"
+    }
+  ]
+}

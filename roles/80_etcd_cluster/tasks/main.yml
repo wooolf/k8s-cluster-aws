@@ -1,0 +1,68 @@
+---
+# tasks file for 80_etcd_cluster
+
+- name: etcd
+  block:
+    - name: Download etcd binaries
+      ansible.builtin.get_url:
+        url: "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"
+        dest: "/home/{{ ansible_user }}/"
+        mode: 0777
+
+    - name: Unarchive
+      ansible.builtin.unarchive:
+        remote_src: true
+        src: /home/{{ ansible_user }}/etcd-v3.4.15-linux-amd64.tar.gz
+        dest: /home/{{ ansible_user }}/
+
+    - name: Copy etcd to /usr/local/bin
+      copy:
+        remote_src: True
+        src: "/home/{{ ansible_user }}/etcd-v3.4.15-linux-amd64/{{ item }}"
+        dest: /usr/local/bin/
+        mode: 0755
+      loop:
+        - etcd
+        - etcdctl
+
+    - name: Configure etcd server
+      ansible.builtin.file:
+        state: directory
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: "0700"
+      loop:
+        - /etc/etcd
+        - /var/lib/etcd
+
+    - name: Copy keys
+      copy:
+        src: "/home/{{ ansible_user }}/{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: 0700
+        remote_src: True
+      register: transfer_keys
+      loop:
+        - { src: ca.pem, dest: /etc/etcd/ }
+        - { src: kubernetes-key.pem, dest: /etc/etcd/ }
+        - { src: kubernetes.pem, dest: /etc/etcd/ }
+
+    - name: Create ETCD service
+      ansible.builtin.template:
+        src: etcd.service.j2
+        dest: /etc/systemd/system/etcd.service
+        mode: 0644
+        owner: root
+        group: root
+
+    - name: Enable etcd
+      ansible.builtin.systemd:
+        name: etcd.service
+        daemon_reload: yes
+        state: started
+        enabled: true
+
+  when: "'controller' in group_names"
+  tags:
+    - etcd
