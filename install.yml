@@ -38,7 +38,7 @@
     - { role: 40_copy_keys_certs, tags: ["copy_secrets"] }
 
 - name: Generate auth config
-  hosts: localhost
+  hosts: all
   vars_files:
     - "{{ playbook_dir }}/aws_config.yml"
     - "{{ playbook_dir }}/global_parameters.yml"

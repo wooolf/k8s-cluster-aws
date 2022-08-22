@@ -3,19 +3,94 @@
 
 - name: Generate config
   block:
-    - name: Transfer scripts
-      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
-      register: transfer_scripts
+    - name: Get Load Balancer endpoint
+      ansible.builtin.shell:
+        cmd: aws elbv2 describe-load-balancers --load-balancer-arns ${LOAD_BALANCER_ARN} --output text --query 'LoadBalancers[0].DNSName'
+      register: lb_endpoint
 
-    - name: Generate auth config
-      command: /bin/bash "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}"
-      args:
-        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
-      with_items:
-        - kube_config.sh
-        - kube_proxy.sh
-        - kube_controller.sh
-        - kube_scheduler.sh
-        - kube_admin.sh
+    - name: Set Load Balancer endpoint variable
+      ansible.builtin.set_fact:
+        KUBERNETES_PUBLIC_ADDRESS: "{{ lb_endpoint.stdout }}"
+
+    - name: Debug
+      debug:
+        msg: "LB endpoint: {{ KUBERNETES_PUBLIC_ADDRESS }}"
+
+    - name: Define workers list
+      ansible.builtin.set_fact:
+        WORKERS:
+          - worker-0
+          - worker-1
+          - worker-2
+
+    - name: Define configuration targets
+      ansible.builtin.set_fact:
+        CONFIG_TARGET:
+          - kube-proxy
+          - kube-controller-manager
+          - kube-scheduler
+          - admin
+
+    - name: Workers config
+      block:
+        - name: Generate config for workers - set cluser
+          ansible.builtin.shell:
+            cmd: kubectl config set-cluster kubernetes-the-hard-way --certificate-authority=ca.pem --embed-certs=true --server=https://{{ KUBERNETES_PUBLIC_ADDRESS }}:443 --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ WORKERS }}"
+
+        - name: Generate config for workers - set credentials
+          ansible.builtin.shell:
+            cmd: kubectl config set-credentials system:node:{{ item }} --client-certificate={{ item }}.pem --client-key={{ item }}-key.pem --embed-certs=true --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ WORKERS }}"
+
+        - name: Generate config for workers - set default context
+          ansible.builtin.shell:
+            cmd: kubectl config set-context default --cluster=kubernetes-the-hard-way --user=system:node:{{ item }} --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ WORKERS }}"
+
+        - name: Workers - use context
+          ansible.builtin.shell:
+            cmd: kubectl config use-context default --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ WORKERS }}"
+
+    - name: Other services config
+      block:
+        - name: Generate config - set cluser
+          ansible.builtin.shell:
+            cmd: kubectl config set-cluster kubernetes-the-hard-way --certificate-authority=ca.pem --embed-certs=true --server=https://127.0.0.1:443 --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ CONFIG_TARGET }}"
+
+        - name: Generate config - set credentials
+          ansible.builtin.shell:
+            cmd: kubectl config set-credentials system:node:{{ item }} --client-certificate={{ item }}.pem --client-key={{ item }}-key.pem --embed-certs=true --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ CONFIG_TARGET }}"
+
+        - name: Generate config - set default context
+          ansible.builtin.shell:
+            cmd: kubectl config set-context default --cluster=kubernetes-the-hard-way --user=system:node:{{ item }} --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ CONFIG_TARGET }}"
+
+        - name: Use context
+          ansible.builtin.shell:
+            cmd: kubectl config use-context default --kubeconfig={{ item }}.kubeconfig
+            chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/"
+          with_items:
+            - "{{ CONFIG_TARGET }}"
+
+  when: "'local' in group_names"
   tags:
     - auth_config

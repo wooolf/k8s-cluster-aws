@@ -1,20 +1,25 @@
 ---
 # tasks file for 60_copy_config
 
-- name: Copy to target
+- name: Copy config
   block:
-    - name: 10 - Execute worker
-      command: /bin/bash {{ item }} {{ playbook_dir }} {{ project.name }}
-      args:
-        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+    - name: 10 - Transfer worker config
+      copy: src="{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item.el }}" dest="/home/{{ ansible_user }}/{{ item.el }}" mode=0644
+      when: inventory_hostname is regex("{{ item.id }}.*") and "'worker' in group_names"
       with_items:
-        - copy2worker.sh
+        - { id: worker-0, el: worker-0.kubeconfig }
+        - { id: worker-0, el: kube-proxy.kubeconfig }
+        - { id: worker-1, el: worker-1.kubeconfig }
+        - { id: worker-1, el: kube-proxy.kubeconfig }
+        - { id: worker-2, el: worker-2.kubeconfig }
+        - { id: worker-2, el: kube-proxy.kubeconfig }
 
-    - name: 20 - Execute controller
-      command: /bin/bash {{ item }} {{ playbook_dir }} {{ project.name }}
-      args:
-        chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
+    - name: 20 - Transfer controller config
+      copy: src={{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }} dest="/home/{{ ansible_user }}/" mode=0644
+      when: "'controller' in group_names"
       with_items:
-        - copy2controller.sh
+        - admin.kubeconfig
+        - kube-controller-manager.kubeconfig
+        - kube-scheduler.kubeconfig
   tags:
-    - copy_config
+    - "copy_config"
