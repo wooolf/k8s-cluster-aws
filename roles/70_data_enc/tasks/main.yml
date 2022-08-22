@@ -7,12 +7,12 @@
       copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
       register: transfer_scripts
 
-    - name: 30 - Generate encription confg file
-      ansible.builtin.template:
-        src: "encr"
-        dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}-csr.json"
-        mode: 0644
-      with_items:
+    # - name: 30 - Generate encription confg file
+    #   ansible.builtin.template:
+    #     src: "encr"
+    #     dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}-csr.json"
+    #     mode: 0644
+    #   with_items:
 
     # - name: 10 - Transfer scripts
     #   copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777

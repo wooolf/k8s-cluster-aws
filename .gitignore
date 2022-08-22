@@ -40,9 +40,14 @@ override.tf.json
 .terraformrc
 terraform.rc
 workspace/*
+workspace_bk/*
 
 # End of https://www.toptal.com/developers/gitignore/api/terraform,ansible
 
-# Completed config files
-aws_config.yml
+# Config files
 global_parameters.yml
+
+# Secrets
+aws_config.yml
+.vault*
+*password*

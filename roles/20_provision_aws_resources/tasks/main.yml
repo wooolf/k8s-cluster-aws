@@ -6,39 +6,40 @@
 
 - name: Provision AWS resources
   block:
-    - name: 00 - Set terraform executor
-      ansible.builtin.set_fact:
-        executor: terraform
-      when: localstack.enabled == false
+    # - name: 00 - Set terraform executor
+    #   ansible.builtin.set_fact:
+    #     executor: terraform
+    #   when: localstack.enabled
 
-    - name: 05 - Set localstack executor
-      ansible.builtin.set_fact:
-        executor: tflocal
-      when: localstack.enabled == true
+    # - name: 05 - Set localstack executor
+    #   ansible.builtin.set_fact:
+    #     executor: tflocal
+    #   when: localstack.enabled
 
-    - name: 10 - Create {{ executor }} manifest
+    - name: 10 - Create terraform manifest
       ansible.builtin.template:
         src: main.j2
-        dest: "{{playbook_dir}}/workspace//{{ project.name }}/main.tf"
+        dest: "{{ playbook_dir }}/workspace//{{ project.name }}/main.tf"
+        mode: 0755
 
-    - name: 20 - {{ executor }} format main.tf
-      command: "{{ executor }} -chdir={{playbook_dir}}/workspace/{{ project.name }} fmt"
+    - name: 20 - "terraform" format main.tf
+      command: "terraform -chdir={{ playbook_dir }}/workspace/{{ project.name }} fmt"
 
-    - name: 30 - {{ executor }} init
-      command: "{{ executor }} -chdir={{playbook_dir}}/workspace/{{ project.name }} init"
+    - name: 30 - "terraform" init
+      command: "terraform -chdir={{ playbook_dir }}/workspace/{{ project.name }} init"
 
-    - name: 40 - {{ executor }} validation
-      command: "{{ executor }} -chdir={{playbook_dir}}/workspace/{{ project.name }} validate -no-color"
+    - name: 40 - "terraform" validation
+      command: "terraform -chdir={{ playbook_dir }}/workspace/{{ project.name }} validate -no-color"
 
     - name: 50 - Set var
       set_fact:
-        ANSIBLE_STDOUT_CALLBACK: "debug"
+        ansible_stdout_callback: "debug"
 
     - name: 60 - Terraform plan
-      command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" plan -out="{{ project.name }}_plan.out"
+      command: terraform -chdir="{{ playbook_dir }}/workspace/{{ project.name }}" plan -out="{{ project.name }}_plan.out"
 
     - name: 70 - Terraform plan show
-      command: tflocal -chdir="{{playbook_dir}}/workspace/{{ project.name }}" show -no-color "{{ project.name }}_plan.out"
+      command: terraform -chdir="{{ playbook_dir }}/workspace/{{ project.name }}" show -no-color "{{ project.name }}_plan.out"
       register: t_plan
 
     # To make it human readable you have to setup parameters in /etc/ansible/ansible.cfg
@@ -46,15 +47,15 @@
     # stdout_callback = yaml
     - name: 80 - Print plan
       vars:
-        ANSIBLE_STDOUT_CALLBACK: "debug"
+        ansible_stdout_callback: "debug"
       debug: msg="{{ t_plan.stdout }}"
     - name: 90 - Terraform apply
-      command: terraform -chdir="{{playbook_dir}}/workspace/{{ project.name }}" apply -auto-approve {{ project.name }}_plan.out
+      command: terraform -chdir="{{ playbook_dir }}/workspace/{{ project.name }}" apply -auto-approve {{ project.name }}_plan.out
       register: t_apply
 
     - name: 100 - Print apply
       vars:
-        ANSIBLE_STDOUT_CALLBACK: "debug"
+        ansible_stdout_callback: "debug"
       debug: msg="{{ t_apply.stdout }}"
   tags:
     - init_terraform
