@@ -7,5 +7,5 @@ resources:
       - aescbc:
           keys:
             - name: key1
-              secret: ${1}
+              secret: {{ encription_key.stdout }}
       - identity: {}

@@ -4,26 +4,23 @@
 - name: Encryption
   block:
     - name: 10 - Generate encription key
-      copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
-      register: transfer_scripts
+      ansible.builtin.shell: head -c 32 /dev/urandom | base64
+      register: encription_key
 
-    # - name: 30 - Generate encription confg file
-    #   ansible.builtin.template:
-    #     src: "encr"
-    #     dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/{{ item }}-csr.json"
-    #     mode: 0644
-    #   with_items:
+    - name: 20 - Generate encription confg file
+      ansible.builtin.template:
+        src: "encryption-config.yaml.j2"
+        dest: "{{ playbook_dir }}/workspace/{{ project.name }}/certs/encryption-config.yaml"
+        mode: 0644
 
-    # - name: 10 - Transfer scripts
-    #   copy: src=./ dest="{{ playbook_dir }}/workspace/{{ project.name }}/certs" mode=0777
-    #   register: transfer_scripts
+  when: "'local' in group_names"
+  tags:
+    - encryption
 
-    # - name: 20 - Execute encryption and copy to controllers
-    #   command: /bin/bash {{ item }} {{ playbook_dir }} {{ project.name }}
-    #   args:
-    #     chdir: "{{ playbook_dir }}/workspace/{{ project.name }}/certs"
-    #   with_items:
-    #     - encryption.sh
-    #     - encryption_copy.sh
+- name: Copy
+  block:
+    - name: 30 - Copy encription config to controllers
+      copy: src={{ playbook_dir }}/workspace/{{ project.name }}/certs/encryption-config.yaml dest="/home/{{ ansible_user }}/encryption-config.yaml" mode=0644
+      when: "'controller' in group_names"
   tags:
     - encryption
