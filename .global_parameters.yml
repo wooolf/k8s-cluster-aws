@@ -1,0 +1,91 @@
+---
+aws_credentials: true
+localstack:
+  enabled: false
+  ami_id: ami-ff0fea8310f3
+
+project:
+  name: k8s_cluster
+  local_user: michal.lucki"
+  local_uid: uid
+
+  default:
+    tags:
+      - { key: "Owner", value: "" }
+      - { key: "Owner email", value: "" }
+
+  cert:
+    names:
+      c:
+      l:
+      o:
+      ou:
+      st:
+    kubernetes_hostnames: kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
+    key:
+      t: rsa
+      b: 2048
+
+  network:
+    vpc:
+      cidr_block: "10.0.0.0/16"
+      tags:
+        - { key: "Name", value: "vpc_k8s" }
+
+    subnets:
+      cidr_block: "10.0.1.0/24"
+      tags:
+        - { key: "Name", value: "subnet_k8s" }
+
+    internet_gateway:
+      tags:
+        - { key: "Name", value: "gateway_k8s" }
+
+    route_table:
+      cidr_block: "0.0.0.0/0"
+      tags:
+        - { key: "Name", value: "rt_k8s" }
+
+    security_groups:
+      name: sg_k8s
+      description: Kubernetes security group
+      ingress_protocol:
+        all:
+          - { "cidr_blocks": "10.0.0.0/16" }
+          - { "cidr_blocks": "10.200.0.0/16" }
+        tcp:
+          - { "port": 22, "cidr_blocks": "0.0.0.0/0" }
+          - { "port": 6443, "cidr_blocks": "0.0.0.0/0" }
+          - { "port": 443, "cidr_blocks": "0.0.0.0/0" }
+        icmp:
+          - { "port": -1, "cidr_blocks": "0.0.0.0/0" }
+
+    load_balancer:
+      name: lb-k8s
+      type: network
+      target_group:
+        name: lb-target-group-k8s
+        port: 6443
+        protocol: TCP
+        target_type: ip
+      group_attachment:
+        name: lb-group-attachment-k8s
+        id: ["10.0.1.10", "10.0.1.11", "10.0.1.12"]
+      listener:
+        port: 443
+        protocol: TCP
+        default_action_type: forward
+
+  instances:
+    ami:
+      name: ami_k8s
+      owner: 099720109477
+      architecture: x86_64
+      device_type: ebs
+      reg_name: ubuntu/images/hvm-ssd/ubuntu-*amd64-server-*
+    ec2:
+      count: 3
+      prefix_name: [controller-, worker-]
+      volume:
+        size: 50
+        type: standard
