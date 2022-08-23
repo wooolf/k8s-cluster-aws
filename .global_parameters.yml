@@ -6,7 +6,7 @@ localstack:
 
 project:
   name: k8s_cluster
-  local_user: michal.lucki"
+  local_user:
   local_uid: uid
 
   default:
