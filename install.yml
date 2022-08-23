@@ -46,3 +46,8 @@
 
   roles:
     - { role: 80_etcd_cluster, tags: ["etcd"], become: true }
+    - {
+        role: 90_provision_control_plane,
+        tags: ["control_plane"],
+        become: true,
+      }

@@ -1,0 +1,70 @@
+---
+# tasks file for 90_provision_control_plane
+
+- name: Control plane
+  block:
+    - name: Kubernetes config dir
+      ansible.builtin.file:
+        state: directory
+        path: "/etc/kubernetes/config"
+        mode: "0600"
+
+    - name: Download control plane binaries
+      ansible.builtin.get_url:
+        url: "{{ item }}"
+        dest: "/home/{{ ansible_user }}/"
+        mode: 0711
+      with_items:
+        - "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-apiserver"
+        - "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-controller-manager"
+        - "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-scheduler"
+        - "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl"
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: "/home/{{ ansible_user }}/{{ item }}"
+        dest: /usr/local/bin/
+        mode: 0711
+        remote_src: true
+      with_items:
+        - "kube-apiserver"
+        - "kube-controller-manager"
+        - "kube-scheduler"
+        - "kubectl"
+
+    - name: Kubernetes libs dir
+      ansible.builtin.file:
+        state: directory
+        path: "/var/lib/kubernetes/"
+        mode: "0600"
+
+    - name: Copy certs and keys
+      ansible.builtin.copy:
+        src: "/home/{{ ansible_user }}/{{ item }}"
+        dest: /var/lib/kubernetes/
+        mode: 0711
+        remote_src: true
+      with_items:
+        - "ca.pem"
+        - "ca-key.pem"
+        - "kubernetes-key.pem"
+        - "kubernetes.pem"
+        - "service-account-key.pem"
+        - "service-account.pem"
+        - "encryption-config.yaml"
+
+    - name: Create kubernetes services
+      ansible.builtin.template:
+        src: "{{ item  }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: 0644
+        owner: root
+        group: root
+      with_items:
+        - kube-apiserver.service.j2
+        - kube-controller-manager.service.j2
+        - kube-scheduler.service.j2
+
+  when: "'controller' in group_names"
+  tags:
+    - control_plane
